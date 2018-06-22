@@ -1,0 +1,108 @@
+﻿#pragma indent
+using System
+using System.IO
+using System.Collections.Generic
+using Haplon.Collections
+
+namespace Haplon.NLP.Resources
+    
+    public class PennTreebank
+        
+        static DataPath = @"\\fs7\home\shindo\Desktop\experiment\TAG\WSJ3_t2c_nonull\"
+        
+        public static TopLabel = "TOP"
+        public static NontermPrefix = "~"
+        public static UnkWord = "UNK"
+        public static IsNonterm(s: string): bool { s.StartsWith(NontermPrefix) }
+        public static MorphSuffixs: array[string] = array["ed", "ing", "ion", "er", "est", "ly", "ity", "y", "al"]
+        
+        public static Read(range: Seq[int]): array[TreeNode[string]]
+            def data = List()
+            foreach (i in range)
+                def s = String.Format("{0:00}", i)
+                def path = $"$(DataPath)WSJ$(s).col2"
+                foreach (line in File.ReadLines(path))
+                    def t = TreeNode.Parse(line)[0].MapAll(n => if (n.IsLeaf) n.Value else $"$(NontermPrefix)$(n.Value)")
+                    data.Add(TreeNode(TopLabel, array[t]))
+            data.ToArray()
+            
+        public static RemoveFuncTag(node: TreeNode[string]): string
+            if (node.IsLeaf || node.IsRoot) node.Value
+            else
+                def v = node.Value.Substring(NontermPrefix.Length, node.Value.Length - NontermPrefix.Length)
+                def s = v.Split(array['-', '='], StringSplitOptions.RemoveEmptyEntries)[0]
+                assert(s.Length > 0)
+                NontermPrefix + s
+                
+        public static CollapseUnary(node: TreeNode[string]): void
+            when (node.Count == 1 && node.Value == node[0].Value)
+                node.SetChildren(node[0].Children)
+            //when (node.Count == 1 && node[0].Count == 1 && !node[0].IsPre)
+            //    node.Children = node[0].Children
+                    
+                
+        public static ReplaceRareWord(data: array[TreeNode[string]], minCount: int): IdTable[string]
+            mutable table: IdTable[string] = IdTable()
+            data.FlatMap(it => it.Leaves).Iter(n => _ = table.Add(n.Value))
+            foreach (tree in data)
+                def words = tree.Leaves.ToArray()
+                foreach (i in [0 .. words.Length - 1])
+                    def id = table.ToId(words[i].Value)
+                    when (table.CountOf(id) <= minCount) words[i].Value = UnkSigneture(words[i].Value, i, table.ContainsKey)
+                    
+            table = IdTable()
+            data.FlatMap(it => it.Leaves).Iter(n => _ = table.Add(n.Value))
+            table
+            // old
+            //def groups = data.FlatMap(it => it.Leaves).GroupBy(it => it.Value)
+            //foreach (g in groups)
+            //    def nodes = g.ToArray()
+            //    when (nodes.Length <= minCount) nodes.Iter(it => it.Value = value)
+            
+        // pos: position of the word in a sentence
+        public static UnkSigneture(word: string, pos: int, isKnown: string -> bool): string
+            def sb = Text.StringBuilder(UnkWord)
+            mutable numCaps = 0
+            mutable (hasDigit, hasDash, hasLower) = (false, false, false)
+            
+            for (mutable i = 0; i < word.Length; i++)
+                def ch = word[i]
+                if (Char.IsDigit(ch)) hasDigit = true
+                else if (ch == '-') hasDash = true
+                else if (Char.IsLetter(ch))
+                    if (Char.IsLower(ch)) hasLower = true
+                    //else if (Character.isTitleCase(ch)) // equivalent .NET method exsits???
+                    //    hasLower = true
+                    //    numCaps++
+                    else numCaps++
+                else {}
+                
+            def ch0 = word[0]
+            def lowered = word.ToLower()
+            if (Char.IsUpper(ch0)) // berkeley: || Character.isTitleCase(ch0)
+                if (pos == 0 && numCaps == 1)
+                    _ = sb.Append("-INITC")
+                    when (isKnown(lowered)) _ = sb.Append("-KNOWNLC")
+                else _ = sb.Append("-CAPS")
+            else if (!Char.IsLetter(ch0) && numCaps > 0) _ = sb.Append("-CAPS")
+            else if (hasLower) _ = sb.Append("-LC")
+            else {}
+                
+            when (hasDigit) _ = sb.Append("-NUM")
+            when (hasDash) _ = sb.Append("-DASH")
+            if (lowered.EndsWith("s") && word.Length >= 3)
+                // here length 3, so you don't miss out on ones like 80s
+                def ch2 = lowered[word.Length - 2]
+                // not -ess suffixes or greek/latin -us, -is
+                when (ch2 != 's' && ch2 != 'i' && ch2 != 'u') _ = sb.Append("-s")
+            else if (word.Length >= 5 && !hasDash && !(hasDigit && numCaps > 0))
+                def opt = MorphSuffixs.Find(s => lowered.EndsWith(s))
+                when (opt.IsSome) _ = sb.Append(opt.Value)
+            else {}
+            sb.ToString()
+            
+            // memo: convert digit
+            //mutable d: double
+            //def isDigit = Double.TryParse(word, Globalization.NumberStyles.Any, null, out d)
+            //if (isDigit) "*DIGIT*"
+            //else word

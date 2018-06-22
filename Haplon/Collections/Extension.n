@@ -1,0 +1,122 @@
+﻿#pragma indent
+using System
+using System.Collections.Generic
+using System.Linq
+using Nemerle.Imperative
+
+namespace Haplon.Collections
+    
+    public type Seq[T] = IEnumerable[T]
+    
+    public module Extension
+        public Append[T](this x: Seq[T], y: Seq[T]): Seq[T] { Enumerable.Concat(x, y) }
+        
+        public Count[T](this x: array[T]): int { x.Length }
+        public Count[T](this x: Seq[T]): int { Enumerable.Count(x) }
+        
+        public Filter[T](this x: array[T], f: T -> bool): array[T] { Array.FindAll(x, f) }
+        public Filter[T](this x: Seq[T], f: T -> bool): Seq[T] { Enumerable.Where(x, f) }
+        
+        public Find[T](this x: array[T], f: T -> bool): option[T]
+            foreach (it in x)
+                when (f(it)) return Some(it)
+            None()
+        public Find[T](this x: Seq[T], f: T -> bool): option[T]
+            foreach (it in x)
+                when (f(it)) return Some(it)
+            None()
+        
+        public FlatMap[T, U](this x: array[T], f: T -> array[U]): array[U]
+            def l = List(x.Length)
+            foreach (it in x) l.AddRange(f(it))
+            l.ToArray()
+        public FlatMap[T, U](this x: Seq[T], f: T -> Seq[U]): Seq[U] { Enumerable.SelectMany(x, f) }
+        
+        public Flatten[T](this x: array[array[T]]): array[T] { x.FlatMap(it => it) }
+        public Flatten[T](this x: Seq[Seq[T]]): Seq[T] { x.FlatMap(it => it) }
+            
+        /// Fold((acc, x) => f)
+        public Fold[T](this x: array[T], f: T * T -> T): T
+            assert(x.Length > 0)
+            mutable acc = x[0]
+            for (mutable i = 1; i < x.Length; i++)
+                acc = f(acc, x[i])
+            acc
+        public Fold[T, U](this x: array[T], seed: U, f: U * T -> U): U
+            assert(x.Length > 0)
+            mutable acc = seed
+            for (mutable i = 0; i < x.Length; i++)
+                acc = f(acc, x[i])
+            acc
+        public Fold[T](this x: Seq[T], f: T * T -> T): T { Enumerable.Aggregate(x, f) }
+        public Fold[T, U](this x: Seq[T], seed: U, f: U * T -> U): U { Enumerable.Aggregate(x, seed, f) }
+        public FoldBack[T, U](this x: array[T], seed: U, f: U * T -> U): U
+            mutable acc = seed
+            for (mutable i = x.Length - 1; i >= 0; i--)
+                acc = f(acc, x[i])
+            acc
+        
+        public ForAll[T](this x: array[T], f: T -> bool): bool { Array.TrueForAll(x, f) }
+        public ForAll[T](this x: Seq[T], f: T -> bool): bool { Enumerable.All(x, f) }
+            
+        public GroupBy[T, U](this x: Seq[T], f: T -> U): Seq[Seq[T]] { Enumerable.GroupBy(x, f) }
+        public GroupBy[T, U](this x: Seq[T], f: T -> U, comparer: IEqualityComparer[U]): Seq[Seq[T]] { Enumerable.GroupBy(x, f, comparer) }
+            
+        public Indices[T](this x: IList[T]): Seq[int] { Enumerable.Range(0, x.Count) }
+        
+        public Iter[T](this x: array[T], f: T -> void): void { Array.ForEach(x, f) }
+        public Iter[T](this x: Seq[T], f: T -> void): void { foreach (it in x) f(it) }
+        
+        public Last[T](this x: array[T]): T { x[x.Length - 1] }
+        public Last[T](this x: IList[T]): T { x[x.Count - 1] }
+        
+        public Map[T, U](this x: array[T], f: T -> U): array[U] { Array.ConvertAll(x, f) }
+        public Map[T, U](this x: Seq[T], f: T -> U): Seq[U] { Enumerable.Select(x, f) }
+        
+        public Max[T](this x: array[T], f: T -> double): double
+            assert(x.Length > 0)
+            mutable m = f(x[0])
+            for (mutable i = 1; i < x.Length; i++)
+                def v = f(x[i])
+                when (m < v) m = v
+            m
+        public Max[T](this x: array[T], f: T -> int): int
+            assert(x.Length > 0)
+            mutable m = f(x[0])
+            for (mutable i = 1; i < x.Length; i++)
+                def v = f(x[i])
+                when (m < v) m = v
+            m
+        public Max(this x: array[double]): double { x.Max(it => it) }
+        public Max(this x: array[int]): int { x.Max(it => it) }
+        public Max[T](this x: Seq[T], f: T -> double): double { Enumerable.Max(x.Map(f)) }
+        public Max[T](this x: Seq[T], f: T -> int): int { Enumerable.Max(x.Map(f)) }
+        public Max(this x: Seq[double]): double { Enumerable.Max(x) }
+        public Max(this x: Seq[int]): int { Enumerable.Max(x) }
+        
+        public Normalize(this x: array[double]): void
+            def sum = x.Sum()
+            assert(sum >= 0.0)
+            when (sum > 0.0)
+                for (mutable i = 0; i < x.Length; i++) x[i] /= sum
+        
+        public Product[T](this x: array[T], f: T -> double): double { x.Fold(1.0, (acc, it) => acc * f(it)) }
+        public Product[T](this x: array[T], f: T -> int): int { x.Fold(1, (acc, it) => acc * f(it)) }
+        public Product(this x: array[double]): double { x.Product(it => it) }
+        public Product(this x: array[int]): int { x.Product(it => it) }
+        public Product[T](this x: Seq[T], f: T -> double): double { x.Fold(1.0, (acc, it) => acc * f(it)) }
+        public Product[T](this x: Seq[T], f: T -> int): int { x.Fold(1, (acc, it) => acc * f(it)) }
+        public Product(this x: Seq[double]): double { x.Product(it => it) }
+        public Product(this x: Seq[int]): int { x.Product(it => it) }
+        
+        public Sum[T](this x: array[T], f: T -> double): double { x.Fold(0.0, (acc, it) => acc + f(it)) }
+        public Sum[T](this x: array[T], f: T -> int): int { x.Fold(0, (acc, it) => acc + f(it)) }
+        public Sum(this x: array[double]): double { x.Sum(it => it) }
+        public Sum(this x: array[int]): int { x.Sum(it => it) }
+        public Sum[T](this x: Seq[T], f: T -> double): double { x.Fold(0.0, (acc, it) => acc + f(it)) }
+        public Sum[T](this x: Seq[T], f: T -> int): int { x.Fold(0, (acc, it) => acc + f(it)) }
+        public Sum(this x: Seq[double]): double { x.Sum(it => it) }
+        public Sum(this x: Seq[int]): int { x.Sum(it => it) }
+        
+        public ToArray[T](this x: Seq[T]): array[T] { Enumerable.ToArray(x) }
+        public ToSeq[T](this x: array[T]): Seq[T] { x }

@@ -1,0 +1,185 @@
+﻿#pragma indent
+using System
+using System.Collections.Generic
+using Haplon.Collections
+using Haplon.Numerics
+using Haplon.Numerics.Statistics
+using Nemerle.Imperative
+
+namespace Haplon.NLP.Grammars
+
+    // argument-adjunct distinction based on CFG.
+    // p(X->ABCD) => p(X->AC): argument * p(^X->B): adjunct * p(^X->D): adjunct
+    public class CFGSA
+        LabelTable: IdTable[string * bool] = IdTable()
+        ObsTrees: array[TreeNode[ObsNode]]
+        NonTermCount: int
+        TermCount: int
+        TreeTable: IdTable[TreeNode[int]] = IdTable(TreeComparer())
+
+        TreeDists: array[PYCRP] // [root]
+        AdjDists: array[PYCRP] // [root]
+        
+        public this(data: array[TreeNode[string]])
+            ObsTrees = data.Map(it => it.MapAll(it => ObsNode(it.Value)))
+            ObsTrees.Iter(it => it.Topdown.NonLeaf().Iter(it => {
+                it.Value.IsFixed = it.IsPre || it.IsLeaf || it.IsRoot;
+                it.Value.Id = LabelTable.Add((it.Value.Label, false));
+                it.Value.BarId = LabelTable.Add((it.Value.Label, true))
+            }))
+            NonTermCount = LabelTable.Count
+            ObsTrees.Iter(it => it.Leaves.Iter(it => it.Value.Id = LabelTable.Add((it.Value.Label, false))))
+            TermCount = LabelTable.Count - NonTermCount
+            
+            def init(n: TreeNode[ObsNode])
+                when (n.Value.IsFixed) return
+                if (n.Count <= 2)
+                    n.Children.Iter(c => c.Value.IsAdj = false)
+                    n.Value.IsFixed = true
+                else n.Children.Iter(c => c.Value.IsAdj = false)
+                def id = AddTree(n)
+                n.Value.TreeId = id
+                AddProb(id, n.Value.BarId)
+            TreeDists = $[1 .. NonTermCount].MapToArray(_ => PYCRP())
+            AdjDists = $[1 .. NonTermCount].MapToArray(_ => PYCRP())
+            ObsTrees.Iter(it => it.Bottomup.NonLeaf().Iter(init))
+        
+        public Gibbs(iterCount: int): void
+            def nodes = ObsTrees.FlatMap(t => t.Topdown.NonLeaf().Filter(n => !n.IsRoot && !n.Parent.Value.IsFixed).ToArray())
+            Console.WriteLine($"# target node: $(nodes.Length)")
+            foreach (iter in [0 .. iterCount - 1])
+                PrintLog(iter)
+                nodes.Shuffle()
+                nodes.Iter(Sample)
+                when (iter > 0 && iter % 10 == 0) Update()
+            PrintLog(iterCount)
+            
+        public Write(path: string): void
+            def toStr(n: TreeNode[int])
+                def s = LabelTable[n.Value]
+                if (s[1]) s[0] + "^"
+                else s[0]
+            def trees = TreeTable.Ids.Map(id => {
+                def t = TreeTable[id];
+                def conv = t.MapAll(toStr);
+                $"$(conv)\t$(TreeTable.CountOf(id))"
+            })
+            
+            //Reconstruct()
+            //def conv(n: TreeNode[ObsNode])
+            //    def v = n.Value
+            //    if (v.IsBar) "^" + v.Label
+            //    else v.Label
+            //def trees = ObsTrees.Map(it => it.MapAll(conv).ToString())
+            IO.File.WriteAllLines(path, trees)
+            
+        PrintLog(iter: int): void
+            when (iter == 0)
+                Console.WriteLine("# Tree: {0}", ObsTrees.Length)
+                Console.WriteLine("# Nonterminal: {0}", NonTermCount)
+                Console.WriteLine("# Terminal: {0}", TermCount)
+            when (iter % 10 == 0)
+                mutable c = 0
+                ObsTrees.Iter(t => t.Topdown.Iter(it => when (it.Value.IsAdj) c++))
+                def likelihood = TreeDists.Sum(d => d.LogLikelihood())
+                Console.WriteLine($"$(iter)\t$(TreeTable.Count)\t$(c)\t$(likelihood)")
+            
+        AddTree(node: TreeNode[ObsNode]): int * array[int]
+            def kids = List(node.Count)
+            def ids = List()
+            for (mutable i = 0; i < node.Count; i++)
+                def v = node[i].Value
+                if (v.IsAdj)
+                    when (i == 0 || !node[i - 1].Value.IsAdj) kids.Add(TreeNode(node.Value.BarId))
+                    ids.Add(v.Id)
+                else kids.Add(TreeNode(v.Id))
+            def tree = TreeNode(node.Value.Id, kids.ToArray())
+            (TreeTable.Add(tree), ids.ToArray())
+        RemoveTree(ids: int * array[int]): void
+            TreeTable.Remove(ids[0])
+        
+        AddProb(ids: int * array[int], bar: int): void
+            ToTreeDist(ids[0]).Add(ids[0])
+            ids[1].Iter(AdjDists[bar].Add)
+        RemoveProb(ids: int * array[int], bar: int): void
+            ToTreeDist(ids[0]).Remove(ids[0])
+            ids[1].Iter(AdjDists[bar].Remove)
+            
+        Prob(ids: int * array[int], bar: int): double
+            mutable p = ToTreeDist(ids[0]).Prob(ids[0])
+            when (ids[1].Length > 0) p *= ids[1].Product(AdjDists[bar].Prob)
+            assert(p >= 0.0 && p <= 1.0)
+            p
+            
+        Reconstruct(): void
+            def nodes = ObsTrees.FlatMap(it => it.Bottomup.NonLeaf().Filter(n => !n.IsPre && !n.Value.IsFixed).ToArray())
+            foreach (node in nodes)
+                def v = node.Value
+                v.IsFixed = true
+                def ranges = ToRanges(node)
+                when (ranges.Length == 1 && !node[ranges[0][0]].Value.IsAdj) continue
+                def kids = List()
+                foreach (r in ranges)
+                    if (node[r[0]].Value.IsAdj)
+                        def ch = $[r[0] .. r[1]].MapToArray(i => node[i]) // copy is better?
+                        ch.Iter(it => it.Value.IsAdj = false)
+                        def tree = TreeNode(node.Value.ToBar(), ch)
+                        kids.Add(tree)
+                    else
+                        $[r[0] .. r[1]].Iter(i => kids.Add(node[i]))
+                node.SetChildren(kids.ToArray())
+            
+        Sample(node: TreeNode[ObsNode]): void
+            def par = node.Parent
+            def v = par.Value
+            def cands = array(2)
+            cands[0] = v.TreeId
+            RemoveProb(v.TreeId, v.BarId)
+            
+            node.Value.IsAdj = !node.Value.IsAdj
+            cands[1] = AddTree(par)
+            
+            def probs = cands.Map(it => Prob(it, v.BarId))
+            def index = probs.Sample()
+            
+            if (index == 0) node.Value.IsAdj = !node.Value.IsAdj
+            else v.TreeId = cands[index]
+            AddProb(cands[index], v.BarId)
+            RemoveTree(cands[Math.Abs(index - 1)])
+            
+        ToTreeDist(id: int): PYCRP { TreeDists[TreeTable[id].Value] }
+            
+        ToRanges(node: TreeNode[ObsNode]): array[int * int]
+            def l = List()
+            mutable i = 0
+            while (i < node.Count)
+                def b = node[i].Value.IsAdj
+                def s = i
+                while (i < node.Count && (b == node[i].Value.IsAdj)) i++
+                l.Add((s, i - 1))
+            l.ToArray()
+            
+        Update(): void
+            TreeDists.Iter(it => it.Update())
+            AdjDists.Iter(it => it.Update())
+            
+        class ObsNode
+            public Label: string
+            public Id: int { get; set; }
+            public BarId: int { get; set; }
+            public IsAdj: bool { get; set; }
+            public IsFixed: bool { get; set; } // children's adjunct is fixed
+            public TreeId: int * array[int] { get; set; } // argument treeid * adjunct symbol ids
+            public IsBar: bool { get Id == BarId }
+            
+            public this(label: string)
+                Label = label
+                
+            public ToBar(): ObsNode
+                def x = ObsNode(Label)
+                x.Id = BarId
+                x.BarId = BarId
+                x
+                
+            public override ToString(): string { $"$(Label)-$(IsAdj)" }
+            

@@ -1,0 +1,29 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{EDCC3B85-0BAD-11DB-BC1A-00112FDE8B61}") = "Haplon", "Haplon\Haplon.nproj", "{E156C090-DD3E-40A0-9470-5061D9E3452F}"
+EndProject
+Project("{EDCC3B85-0BAD-11DB-BC1A-00112FDE8B61}") = "Test", "Test\Test.nproj", "{4608C0AE-C824-4E8D-BD16-EF948404AECF}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E156C090-DD3E-40A0-9470-5061D9E3452F} = {E156C090-DD3E-40A0-9470-5061D9E3452F}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E156C090-DD3E-40A0-9470-5061D9E3452F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E156C090-DD3E-40A0-9470-5061D9E3452F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E156C090-DD3E-40A0-9470-5061D9E3452F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E156C090-DD3E-40A0-9470-5061D9E3452F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4608C0AE-C824-4E8D-BD16-EF948404AECF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4608C0AE-C824-4E8D-BD16-EF948404AECF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4608C0AE-C824-4E8D-BD16-EF948404AECF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4608C0AE-C824-4E8D-BD16-EF948404AECF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

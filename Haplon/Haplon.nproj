@@ -1,0 +1,140 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>e156c090-dd3e-40a0-9470-5061d9e3452f</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Haplon</RootNamespace>
+    <AssemblyName>Haplon</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <NoStdLib>true</NoStdLib>
+    <NemerleVersion>Net-4.0</NemerleVersion>
+    <NemerleBinPathRoot Condition=" '$(NemerleBinPathRoot)' == '' ">$(ProgramFiles)\Nemerle</NemerleBinPathRoot>
+    <Nemerle Condition=" '$(Nemerle)' == '' ">$(NemerleBinPathRoot)\$(NemerleVersion)</Nemerle>
+    <Name>Haplon</Name>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugSymbols>false</DebugSymbols>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <DocumentationFile>$(OutputPath)\$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="MathNet.Numerics, Version=2.5.0.27, Culture=neutral, PublicKeyToken=null">
+      <Name>MathNet.Numerics</Name>
+      <AssemblyName>MathNet.Numerics.dll</AssemblyName>
+      <HintPath>lib\MathNet.Numerics.dll</HintPath>
+    </Reference>
+    <Reference Include="mscorlib" />
+    <Reference Include="Nemerle.Peg, Version=1.2.0.9, Culture=neutral, PublicKeyToken=null">
+      <Name>Nemerle.Peg</Name>
+      <AssemblyName>Nemerle.Peg.dll</AssemblyName>
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Nemerle\net-4.0\Nemerle.Peg.dll</HintPath>
+    </Reference>
+    <Reference Include="Nemerle.Peg.Macros, Version=1.2.0.9, Culture=neutral, PublicKeyToken=null">
+      <Name>Nemerle.Peg.Macros</Name>
+      <AssemblyName>Nemerle.Peg.Macros.dll</AssemblyName>
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Nemerle\net-4.0\Nemerle.Peg.Macros.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Xml.Linq">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Data.DataSetExtensions">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+    <Reference Include="Nemerle">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(Nemerle)\Nemerle.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <MacroReference Include="Nemerle.Linq">
+      <HintPath>$(Nemerle)\Nemerle.Linq.dll</HintPath>
+    </MacroReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Collections\Extension.n">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Collections\IdTable.n">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Collections\Structs.n">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Collections\TreeNode.n">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="NLP\Grammars\BubsParser.n">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="NLP\Grammars\CFGSA.n">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="NLP\Grammars\TSG.n">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="NLP\Grammars\TSGSA.n">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="NLP\HPYLM.n">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="NLP\Resources\HeadRule.n">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="NLP\Resources\PennTreebank.n">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Numerics\Random.n">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Numerics\Statistics\PYCRP.n">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Numerics\Statistics\SliceSampler.n">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Properties\AssemblyInfo.n" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Collections" />
+    <Folder Include="NLP\Grammars" />
+    <Folder Include="NLP\Resources" />
+    <Folder Include="Numerics" />
+    <Folder Include="NLP" />
+    <Folder Include="Numerics\Statistics" />
+    <Folder Include="Properties\" />
+  </ItemGroup>
+  <Import Project="$(Nemerle)\Nemerle.MSBuild.targets" />
+  <!--
+		To modify your build process, add your task inside one of the targets below and uncomment it. 
+		Other similar extension points exist, see Microsoft.Common.targets.
+
+	<Target Name="BeforeBuild">
+	</Target>
+	<Target Name="AfterBuild">
+	</Target>
+	-->
+</Project>

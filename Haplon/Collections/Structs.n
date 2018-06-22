@@ -1,0 +1,7 @@
+﻿#pragma indent
+
+namespace Haplon.Collections
+
+    [Record] public struct Int2
+        public X: int
+        public Y: int

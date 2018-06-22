@@ -1,0 +1,51 @@
+﻿#pragma indent
+using System
+using System.Collections.Generic
+using Haplon.Collections
+using Haplon.NLP.Resources
+
+namespace Haplon.NLP.Grammars
+
+    public class BubsParser
+        // note: root node must be "X_0" such as "TOP_0" abd "ROOT_0"
+        // note: unknown word must be "UNK_xxx"
+        // command: /chisho/shindo/java/jdk1.7.0_21/bin/java -jar parse.jar -p CYK -O maxBeamWidth=10000000 -O lexicalRowBeamWidth=10000000 -O lexicalRowUnaries=10000000 -g test.gr sec22.txt > test.est 
+        
+        static JavaLinux = @"\\fs7\home\shindo\java\/jdk1.7.0_21\bin\java"
+        static ExePath = @"\\fs7\home\shindo\Desktop\library\bubs-parser-20130530\parse.jar"
+        static Arg0 = "-jar parse.jar -p CYK -v 2 -O maxBeamWidth=10000000 -O lexicalRowBeamWidth=10000000 -O lexicalRowUnaries=10000000"
+            
+        public this(data: Seq[TreeNode[string] * double])
+            def data = Merge(data)
+            def (unlex, lex) = (List(), List())
+            unlex.Add("TOP_0")
+            for (mutable i = 0; i < data.Length; i++)
+                def (tree, prob) = (data[i][0], data[i][1])
+                def bin = tree.BinarizeUnique(i)
+                when (bin.Value == PennTreebank.TopLabel) bin.Value = "TOP_0"
+                    
+                def bins = bin.Topdown.NonLeaf().Map(n => n.ToCFG()).ToArray()
+                def rules = (bins[0], Math.Log(prob)) :: $[1 .. bins.Length - 1].Map(i => (bins[i], 0.0))
+                foreach (r in rules)
+                    def isUnlex = TreeNode.IsVirtual(r[0][0].Value) || PennTreebank.IsNonterm(r[0][0].Value) // should be modified
+                    def l = if (isUnlex) unlex else lex
+                    l.Add(Format(r))
+                
+            def lines = List(unlex.Count + lex.Count + 1)
+            lines.AddRange(unlex)
+            lines.Add("===== LEXICON =====")
+            lines.AddRange(lex)
+            IO.File.WriteAllLines("test.gr", lines)
+                        
+        Format(rule: TreeNode[string] * double): string
+            def tree = rule[0]
+            def s = String.Join(" ", tree.Children.Map(c => c.Value))
+            $"$(tree.Value) -> $(s) $(rule[1])"
+                
+        Merge(data: Seq[TreeNode[string] * double]): array[TreeNode[string] * double]
+            def dict = Dictionary(TreeComparer())
+            foreach (r in data)
+                if (dict.ContainsKey(r[0])) dict[r[0]] += r[1]
+                else dict.Add(r[0], r[1])
+            dict.Map(kv => (kv.Key, kv.Value)).ToArray()
+            

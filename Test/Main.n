@@ -1,0 +1,60 @@
+﻿#pragma indent
+//using Nemerle.Collections
+//using Nemerle.Text
+//using Nemerle.Utility
+using System
+using System.Collections.Generic
+using System.Console
+using Haplon.Collections
+using Haplon.NLP
+using Haplon.NLP.Resources
+using Haplon.NLP.Grammars
+
+module Program
+    Main() : void
+        def w = Diagnostics.Stopwatch()
+        w.Start()
+        
+        mutable trees = Dataset()
+        //trees = trees.Map(t => t.BinarizeRight())
+        
+        def m = TSGSA(trees)
+        m.Gibbs(10)
+        m.Parse()
+
+        w.Stop()
+        WriteLine("Time: {0}", w.Elapsed)
+        _ = ReadLine()
+        
+    Test(trees: array[TreeNode[string]]): void
+        ()
+        //def bin = trees.Map(it => it.BinarizeRightAll(it => "^" + it))
+        //def tab = IdTable(TreeComparer())
+        //bin.Iter(it => it.Topdown.NonLeaf().Iter(it => when (!it.IsPre) _ = tab.Add(it.ToCFG())))
+        //def strs = tab.Ids.Map(id => $"$(tab[id])\t$(tab.CountOf(id))")
+        //IO.File.WriteAllLines("bin.out", strs)
+        //WriteLine(tab.Count)
+    
+    Dataset(): array[TreeNode[string]]
+        def (train, test) = (PennTreebank.Read($[2 .. 2]), PennTreebank.Read($[22 .. 22]))
+        foreach (trees in array[train, test]) trees.Iter(t => {
+            t.Topdown.Iter(n => n.Value = PennTreebank.RemoveFuncTag(n));
+            t.Topdown.Iter(PennTreebank.CollapseUnary)
+        })
+        def wordTable = PennTreebank.ReplaceRareWord(train, 1)
+        
+        foreach (t in test)
+            def words = t.Leaves.ToArray()
+            foreach (i in [0 .. words.Length - 1])
+                def w = words[i].Value
+                when (!wordTable.ContainsKey(w))
+                    def unk = PennTreebank.UnkSigneture(w, i, wordTable.ContainsKey)
+                    words[i].Value = if (wordTable.ContainsKey(unk)) unk else PennTreebank.UnkWord
+                    //words[i].Value = PennTreebank.UnkSigneture(w, i, wordTable.ContainsKey)
+                    assert(wordTable.ContainsKey(words[i].Value))
+                    
+        IO.File.WriteAllLines("sec22.gold", test.Map(t => t.ToString()))
+        def sents = test.Map(t => String.Join(" ", t.Leaves.Map(n => n.Value)))
+        IO.File.WriteAllLines("sec22.txt", sents)
+        
+        train

@@ -1,0 +1,207 @@
+﻿#pragma indent
+using System
+using System.Collections.Generic
+using System.Collections.ObjectModel
+using Nemerle.Peg
+
+namespace Haplon.Collections
+
+    public class TreeNode[T]
+        public static VirtualPrefix = "@"
+        public Value: T { get; set; }
+        public Parent: TreeNode[T] { get; private set; }
+        internal Children: array[TreeNode[T]] { get; private set; }
+        public Hash: int { get; private set; }
+        
+        public Ancestors: Seq[TreeNode[T]]
+            get
+                when (!IsRoot)
+                    yield Parent
+                    foreach (a in Parent.Ancestors) yield a
+        public Bottomup: Seq[TreeNode[T]]
+            get
+                foreach (c in Children)
+                    foreach (gc in c.Bottomup) yield gc
+                yield this
+        public Count: int { get Children.Length }
+        public IsInter: bool { get !IsRoot & !IsLeaf }
+        public IsLeaf: bool { get Count == 0 }
+        public IsPre: bool { get Count > 0 && Array.TrueForAll(Children, c => c.IsLeaf) }
+        public IsRoot: bool { get Parent == null }
+        public Item[index: int]: TreeNode[T] { get Children[index] }
+        public Leaves: Seq[TreeNode[T]] { get Topdown.Filter(it => it.IsLeaf) }
+        public Topdown: Seq[TreeNode[T]]
+            get
+                yield this
+                foreach (c in Children)
+                    foreach (gc in c.Topdown) yield gc
+        
+        public this(value: T) { this(value, array[]) }
+        public this(value: T, children: array[TreeNode[T]])
+            Value = value
+            Children = children
+            Update()
+                
+        //public BinarizeRight(f: T -> T): TreeNode[T]
+        //    if (Count <= 2) TreeNode(Value, Children)
+        //    else
+        //        mutable n = this[0]
+        //        foreach (i in [1 .. Count - 2]) n = TreeNode(f(Value), array[n, this[i]])
+        //        TreeNode(Value, array[n, Children.Last()])
+        //public BinarizeRightAll(f: T -> T): TreeNode[T]
+        //    def kids = Children.Map(c => c.BinarizeRightAll(f))
+        //    def tree = TreeNode(Value, kids)
+        //    if (Count <= 2) tree
+        //    else tree.BinarizeRight(f)
+                
+        public Clone(stop: TreeNode[T] -> bool): TreeNode[T] { Map(it => it.Value, stop) }
+        public CloneAll(): TreeNode[T] { MapAll(it => it.Value) }
+        
+        public Depth(): int
+            if (IsLeaf) 0
+            else Children.Max(it => it.Depth()) + 1
+        
+        public Extract[U](f: TreeNode[T] -> U, stop: TreeNode[T] -> bool?): TreeNode[U]
+            def kids = List(Count)
+            foreach (c in Children)
+                def b = stop(c)
+                when (b != null)
+                    if (b == true) kids.Add(TreeNode(f(c)))
+                    else kids.Add(c.Extract(f, stop))
+            //when (Count > 0) assert(kids.Count > 0) // necessary?
+            TreeNode(f(this), kids.ToArray())
+            
+        public Position(): int
+            mutable i = 0
+            while (!ReferenceEquals(Parent[i], this)) i++
+            i
+            
+        public Map[U](f: TreeNode[T] -> U, stop: TreeNode[T] -> bool): TreeNode[U]
+            def kids = Children.Map(c => if (stop(c)) TreeNode(f(c)) else c.Map(f, stop)) 
+            TreeNode(f(this), kids)
+        public MapAll[U](f: TreeNode[T] -> U): TreeNode[U] { Map(f, _ => false) }
+        
+        public SetChildren(children: array[TreeNode[T]]): void
+            Children = children
+            Children.Iter(c => c.Parent = this)
+            Update()
+        
+        /// the number of CFG
+        public Size(): int
+            if (IsLeaf) 0
+            else Children.Sum(it => it.Size()) + 1
+            
+        public ToCFG(): TreeNode[T] { ToCFG(n => n.Value) }
+        public ToCFG[U](f: TreeNode[T] -> U): TreeNode[U]
+            assert(!IsLeaf)
+            TreeNode(f(this), Children.Map(c => TreeNode(f(c))))
+        
+        public override ToString(): string { ToString(it => it.ToString()) }
+        public ToString(f: T -> string): string
+            if (IsLeaf) f(Value)
+            else
+                def s = String.Join(" ", Children.Map(it => it.ToString(f)))
+                String.Format("({0} {1})", f(Value), s)
+            
+        internal Update(): void
+            Hash = Value.GetHashCode()
+            foreach (i in [0 .. Count - 1]) Hash ^= (unchecked(397 * this[i].Hash + i + 1))
+            Children.Iter(c => c.Parent = this)
+            Parent?.Update()
+                
+        // static
+        public static IsVirtual(s: string): bool { s.StartsWith(VirtualPrefix) }
+        public static ToVirtual(s: string): string
+            if (IsVirtual(s)) s
+            else VirtualPrefix + s
+            
+        public static NonLeaf(this source: Seq[TreeNode[T]]): Seq[TreeNode[T]] { source.Filter(it => !it.IsLeaf) }
+        
+        public static Parse(text: string): TreeNode[string]
+            def p = Tree.Parser()
+            match (p.Parse(text))
+                | option.Some(t) => t
+                | option.None => throw Exception("Invalid text.")
+        
+    public class TreeComparer[T]: EqualityComparer[TreeNode[T]]
+        public override Equals(x: TreeNode[T], y: TreeNode[T]): bool
+            if (x.Count != y.Count) false
+            else if (!x.Value.Equals(y.Value)) false
+            else
+                def eq(i)
+                    if (i == x.Count) true
+                    else if (Equals(x[i], y[i])) eq(i + 1)
+                    else false
+                eq(0)
+            
+        public override GetHashCode(x: TreeNode[T]): int { x.Hash }
+        
+    public module Tree
+        
+        public BinarizeRight(this x: TreeNode[string]): void
+            when (x.Count <= 2)
+                def v = TreeNode.VirtualPrefix + x.Value
+                mutable n = x[0]
+                foreach (i in [1 .. x.Count - 2]) n = TreeNode(v, array[n, x[i]])
+                x.SetChildren(array[n, x.Children.Last()])
+                
+        // append id and node index to make the tree unique
+        public BinarizeUnique(this x: TreeNode[string], id: int): TreeNode[string]
+            x.BinarizeRight()
+            mutable count = 0
+            foreach (n in x.Topdown.Filter(n => n.IsInter))
+                n.Value = $"$(n.Value)_$(id)-$(count)"
+                count++
+            x.CloneAll()
+                
+        //// should be modified
+        //public BinarizeCenterHead(this x: TreeNode[string]): TreeNode[string]
+        //    def kids = x.Children.Map(c => c.BinarizeCenterHead())
+        //    if (x.Count <= 2) TreeNode(x.Value, kids)
+        //    else
+        //        def h = x.Children.Indices().Find(it => x[it].Value.Contains("-H")).Value
+        //        assert(h >= 0 && h < x.Count)
+        //        mutable n = kids[h]
+        //        def indices = ($[h + 1 .. x.Count - 1] + $[0 .. h - 1]).ToArray()
+        //        foreach (i in [0 .. indices.Length - 2]) n = TreeNode(TreeNode.VirtualPrefix + x[h].Value, array[n, kids[indices[i]]])
+        //        TreeNode(x.Value, array[n, kids[indices.Last()]])
+                
+        //// append id and node index to make the tree unique
+        //public BinarizeUnique(this x: TreeNode[string], id: int): TreeNode[string]
+        //    def tree = x.BinarizeRight()
+        //    mutable count = 0
+        //    foreach (n in tree.Topdown.Filter(it => it.IsInter))
+        //        n.Value = $"$(n.Value)_$(id)-$(count)"
+        //        count++
+        //    tree.CloneAll()
+                
+        //public BinarizeLeft(this x: TreeNode[string]): TreeNode[string]
+        //    def kids = x.Children.Map(c => c.BinarizeLeft())
+        //    if (x.Count <= 2) TreeNode(x.Value, kids)
+        //    else
+        //        mutable n = kids.Last()
+        //        foreach (i in [x.Count - 2, x.Count - 3 .. 1]) n = TreeNode($"$(TreeNode.VirtualPrefix)$(x.Value)", array[kids[i], n])
+        //        TreeNode(x.Value, array[kids[0], n])
+            
+        //public BinarizeRight(this x: TreeNode[string]): TreeNode[string]
+        //    def kids = x.Children.Map(c => c.BinarizeRight())
+        //    if (x.Count <= 2) TreeNode(x.Value, kids)
+        //    else
+        //        mutable n = kids[0]
+        //        foreach (i in [1 .. x.Count - 2]) n = TreeNode($"$(TreeNode.VirtualPrefix)$(x.Value)", array[n, kids[i]])
+        //        TreeNode(x.Value, array[n, kids.Last()])
+        
+namespace Haplon.Collections.Tree {
+        
+    [PegGrammar(Options = EmitDebugSources, Nonterminal, grammar {
+        Symbol = (!' ' !'(' !')' [Any])+;
+        Open = ' '* '(';
+        Close = ')' ' '*;
+        Terminal: TreeNode[string] = ' '+ Symbol;
+        Nonterminal: TreeNode[string] = Open Symbol (Nonterminal / Terminal)+ Close;
+    })]
+    class Parser {
+        Terminal(_: NToken, value: NToken): TreeNode[string] { TreeNode(GetText(value)) }
+        Nonterminal(_: NToken, value: NToken, childs: List[TreeNode[string]], _: NToken): TreeNode[string] { TreeNode(GetText(value), childs.ToArray()) }
+    }
+}
